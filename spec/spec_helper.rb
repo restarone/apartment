@@ -13,23 +13,21 @@ require File.expand_path('dummy/config/environment.rb', __dir__)
 Apartment.excluded_models.each do |model|
   klass = model.constantize
 
-  Apartment.connection_class.remove_connection(klass)
-  klass.clear_all_connections!
+  klass.remove_connection
+  klass.connection_handler.clear_all_connections!
   klass.reset_table_name
 end
 
 require 'rspec/rails'
-require 'capybara/rspec'
-require 'capybara/rails'
 
-# rubocop:disable Lint/ConstantDefinitionInBlock
 begin
   require 'pry'
+  # rubocop:disable Lint/ConstantDefinitionInBlock
   silence_warnings { IRB = Pry }
+  # rubocop:enable Lint/ConstantDefinitionInBlock
 rescue LoadError
   nil
 end
-# rubocop:enable Lint/ConstantDefinitionInBlock
 
 ActionMailer::Base.delivery_method = :test
 ActionMailer::Base.perform_deliveries = true
@@ -38,16 +36,17 @@ ActionMailer::Base.default_url_options[:host] = 'test.com'
 Rails.backtrace_cleaner.remove_silencers!
 
 # Load support files
-Dir["#{File.dirname(__FILE__)}/support/**/*.rb"].each { |f| require f }
+Dir["#{File.dirname(__FILE__)}/support/**/*.rb"].sort.each { |f| require f }
 
 RSpec.configure do |config|
-  config.include RSpec::Integration::CapybaraSessions, type: :request
   config.include Apartment::Spec::Setup
 
   # Somewhat brutal hack so that rails 4 postgres extensions don't modify this file
+  # rubocop:disable RSpec/BeforeAfterAll
   config.after(:all) do
     `git checkout -- spec/dummy/db/schema.rb`
   end
+  # rubocop:enable RSpec/BeforeAfterAll
 
   # rspec-rails 3 will no longer automatically infer an example group's spec type
   # from the file location. You can explicitly opt-in to the feature using this
@@ -62,4 +61,4 @@ RSpec.configure do |config|
 end
 
 # Load shared examples, must happen after configure for RSpec 3
-Dir["#{File.dirname(__FILE__)}/examples/**/*.rb"].each { |f| require f }
+Dir["#{File.dirname(__FILE__)}/examples/**/*.rb"].sort.each { |f| require f }

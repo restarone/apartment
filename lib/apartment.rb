@@ -5,16 +5,15 @@ require 'active_support/core_ext/object/blank'
 require 'forwardable'
 require 'active_record'
 require 'apartment/tenant'
+require 'apartment/deprecation'
 
 require_relative 'apartment/log_subscriber'
+require_relative 'apartment/active_record/connection_handling'
+require_relative 'apartment/active_record/schema_migration'
+require_relative 'apartment/active_record/internal_metadata'
 
-if ActiveRecord.version.release >= Gem::Version.new('6.0')
-  require_relative 'apartment/active_record/connection_handling'
-end
-
-if ActiveRecord.version.release >= Gem::Version.new('6.1')
-  require_relative 'apartment/active_record/schema_migration'
-  require_relative 'apartment/active_record/internal_metadata'
+if ActiveRecord.version.release >= Gem::Version.new('7.1')
+  require_relative 'apartment/active_record/postgres/schema_dumper'
 end
 
 # Apartment main definitions
@@ -33,14 +32,10 @@ module Apartment
     attr_accessor(*ACCESSOR_METHODS)
     attr_writer(*WRITER_METHODS)
 
-    if ActiveRecord.version.release >= Gem::Version.new('6.1')
-      def_delegators :connection_class, :connection, :connection_db_config, :establish_connection
+    def_delegators :connection_class, :connection, :connection_db_config, :establish_connection
 
-      def connection_config
-        connection_db_config.configuration_hash
-      end
-    else
-      def_delegators :connection_class, :connection, :connection_config, :establish_connection
+    def connection_config
+      connection_db_config.configuration_hash
     end
 
     # configure apartment with available options
@@ -57,7 +52,7 @@ module Apartment
     end
 
     def tld_length=(_)
-      Apartment::Deprecation.warn('`config.tld_length` have no effect because it was removed in https://github.com/influitive/apartment/pull/309')
+      Apartment::DEPRECATOR.warn('`config.tld_length` have no effect because it was removed in https://github.com/influitive/apartment/pull/309')
     end
 
     def db_config_for(tenant)
@@ -107,13 +102,13 @@ module Apartment
     def database_schema_file
       return @database_schema_file if defined?(@database_schema_file)
 
-      @database_schema_file = Rails.root.join('db', 'schema.rb')
+      @database_schema_file = Rails.root.join('db/schema.rb')
     end
 
     def seed_data_file
       return @seed_data_file if defined?(@seed_data_file)
 
-      @seed_data_file = Rails.root.join('db', 'seeds.rb')
+      @seed_data_file = Rails.root.join('db/seeds.rb')
     end
 
     def pg_excluded_names
